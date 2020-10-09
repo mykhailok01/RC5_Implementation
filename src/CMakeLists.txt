@@ -1,9 +1,7 @@
 cmake_minimum_required(VERSION 3.2)
-project(divider)
+project(project_src)
 
-add_subdirectory(division)
 set(SOURCE_FILES main.cpp)
 
-add_executable(divider ${SOURCE_FILES})
-target_link_libraries(divider division)
-install(TARGETS divider DESTINATION ${DIVISIBLE_INSTALL_BIN_DIR})
+add_executable(project_src ${SOURCE_FILES})
+install(TARGETS project_src DESTINATION ${DIVISIBLE_INSTALL_BIN_DIR})
