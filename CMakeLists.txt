@@ -12,6 +12,7 @@ set(PROJECT_INSTALL_BIN_DIR ${PROJECT_SOURCE_DIR}/bin)
 set(PROJECT_INSTALL_LIB_DIR ${PROJECT_SOURCE_DIR}/lib)
 
 include_directories(${PROJECT_INSTALL_INCLUDE_DIR})
+include_directories(${PROJECT_SOURCE_DIR}/src/RC5)
 
 add_subdirectory(src)
 add_subdirectory(test)
