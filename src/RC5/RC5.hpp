@@ -47,13 +47,24 @@ public:
   // std::std::vector<char> v;; }
   std::pair<Word, Word> encrypt(const std::pair<Word, Word> in) {
     Word A = in.first, B = in.second;
-    A = A + S[0];
-    B = B + S[1];
+    A += S[0];
+    B += S[1];
     for (Byte i = 1; i <= r; ++i) {
       A = leftRotate(A ^ B, B) + S[2 * i];
       B = leftRotate(B ^ A, A) + S[2 * i + 1];
     }
-    return std::pair<Word, Word>(A, B);
+    return std::pair(A, B);
+  }
+
+  std::pair<Word, Word> decrypt(const std::pair<Word, Word> in) {
+    Word A = in.first, B = in.second;
+    for (Byte i = r; i >= 1; --i) {
+      B = rightRotate(B - S[2 * i + 1], A) ^ A;
+      A = rightRotate(A - S[2 * i], B) ^ B;
+    }
+    B -= S[1];
+    A -= S[0];
+    return std::pair(A, B);
   }
 
 private:
