@@ -12,7 +12,7 @@ template <class Word> struct RC5Consts {
   static_assert(std::is_same<Word, std::uint16_t>::value ||
                     std::is_same<Word, std::uint32_t>::value ||
                     std::is_same<Word, std::uint64_t>::value,
-                "Word can only be uint16_t, uint32_t, uint64_t");
+                "Word can only be uint16_t, uint32_t or uint64_t");
   static const Word P;
   static const Word Q;
   static const Byte w = sizeof(Word) * CHAR_BIT;
