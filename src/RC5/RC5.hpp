@@ -7,7 +7,9 @@
 #include <utility>
 #include <vector>
 
+namespace rc5 {
 using Byte = uint8_t;
+
 template <class Word> struct RC5Consts {
   static_assert(std::is_same<Word, std::uint16_t>::value ||
                     std::is_same<Word, std::uint32_t>::value ||
@@ -38,13 +40,12 @@ template <class Word, Byte r, Byte b> class RC5 {
   std::array<Word, t> S;
 
 public:
-  RC5(const std::array<Byte, b> &K) : L{}, S{} {
+  static constexpr Byte BLOCK_SIZE = RC5Consts<Word>::u * 2;
+  explicit RC5(const std::array<Byte, b> &K) : L{}, S{} {
     initL(K);
     initS();
     mixSL();
   }
-  // std::vector<Byte> encrypt(const std::vector<Byte> &in) { return
-  // std::std::vector<char> v;; }
   std::pair<Word, Word> encrypt(const std::pair<Word, Word> in) {
     Word A = in.first, B = in.second;
     A += S[0];
@@ -100,5 +101,78 @@ private:
     }
   }
 };
+
+enum class Type {
+  NoPad,
+  Pad
+};
+
+template <class Word, Byte r, Byte b, Type pad>
+class RC5_CBC : private RC5<Word, r, b> {
+public:
+  using RC5<Word, r, b>::BLOCK_SIZE; // BB
+private:
+  using Block = std::array<Byte, BLOCK_SIZE>;
+  const Block I;
+  Block inputBlock;
+  Block chainBlock;
+  Byte inputBlockIndex;
+
+public:
+  explicit RC5_CBC(const std::array<Byte, b> &K,
+                   const std::array<Byte, BLOCK_SIZE> I = {})
+      : RC5<Word, r, b>(K), I(I), inputBlock{}, chainBlock(I),
+        inputBlockIndex(0) {}
+
+private:
+  std::pair<Word, Word> getLittleEndianWords(Block bytes) {
+    Word A = 0, B = 0;
+    for (Byte i = 0; i < BLOCK_SIZE / 2; ++i) {
+      Byte shift = (1 << 3) * i;
+      A += bytes[i] << shift;
+    }
+    for (Byte i = BLOCK_SIZE / 2; i < BLOCK_SIZE; ++i) {
+      Byte shift = (1 << 3) * (i - BLOCK_SIZE / 2);
+      B += bytes[i] << shift;
+    }
+    return {A, B};
+  }
+  Block getBlock(std::pair<Word, Word> in) {
+    Word A = in.first, B = in.second;
+    Block out{};
+    for (Byte i = 0; i < BLOCK_SIZE / 2; ++i) {
+      Byte shift = (1 << 3) * i;
+      out[i] = (A >> shift) & 0xff;
+    }
+    for (Byte i = BLOCK_SIZE / 2; i < BLOCK_SIZE; ++i) {
+      Byte shift = (1 << 3) * (i - BLOCK_SIZE / 2);
+      out[i] = (A >> shift) & 0xff;
+    }
+    return out;
+  }
+
+  void blockEncrypt(std::pair<Word, Word> in) { ; }
+  void encryptUpdate(const std::vector<Byte> &plainText,
+                     std::vector<Byte> &C) {
+    using SizeT = std::vector<Byte>::size_type;
+    SizeT N = plainText.size();
+    SizeT plainIndex = 0;
+    while (plainIndex < N) {
+      if (inputBlockIndex < BLOCK_SIZE) {
+        inputBlock[inputBlockIndex] = plainText[plainIndex];
+        ++inputBlockIndex;
+        ++plainIndex;
+      }
+      if (inputBlockIndex == BLOCK_SIZE) {
+        inputBlockIndex = 0;
+        for (Byte j = 0; j < BLOCK_SIZE; ++j)
+          inputBlock[j] ^= chainBlock[j];
+        blockEncrypt();
+      }
+    }
+  }
+};
+
+} // namespace rc5
 
 #endif
