@@ -6,6 +6,7 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <cassert>
 
 namespace rc5 {
 using Byte = uint8_t;
@@ -124,6 +125,13 @@ public:
       : RC5<Word, r, b>(K), I(I), inputBlock{}, chainBlock(I),
         inputBlockIndex(0) {}
 
+  void encrypt(const std::vector<Byte> &plainText,
+                     std::vector<Byte> &C)
+  {
+    encryptUpdate(plainText, C);
+    encryptFinal(C);
+  }
+
 private:
   std::pair<Word, Word> getLittleEndianWords(Block bytes) {
     Word A = 0, B = 0;
@@ -151,7 +159,12 @@ private:
     return out;
   }
 
-  void blockEncrypt(std::pair<Word, Word> in) { ; }
+  void blockEncrypt() {
+    auto in = getLittleEndianWords(inputBlock);
+    auto encrypted = RC5<Word, r, b>::encrypt();
+    chainBlock = getBlock(encrypted);
+  }
+
   void encryptUpdate(const std::vector<Byte> &plainText,
                      std::vector<Byte> &C) {
     using SizeT = std::vector<Byte>::size_type;
@@ -168,8 +181,24 @@ private:
         for (Byte j = 0; j < BLOCK_SIZE; ++j)
           inputBlock[j] ^= chainBlock[j];
         blockEncrypt();
+        for (Byte j = 0; j < BLOCK_SIZE; ++j)
+          C.push_back(chainBlock[j]);
       }
     }
+  }
+
+  void encryptFinal(std::vector<Byte> &C) {
+    assert(pad == Type::NoPad && inputBlockIndex == 0);
+    Byte padLength = BLOCK_SIZE - inputBlockIndex;
+    for( Byte j = 0; j < padLength; ++j){
+      inputBlock[inputBlockIndex] = padLength;
+      ++inputBlockIndex;
+    }
+    for (Byte j = 0; j < BLOCK_SIZE; ++j)
+      inputBlock[j] ^= chainBlock[j];
+    blockEncrypt();
+    for (Byte j = 0; j < BLOCK_SIZE; ++j)
+      C.push_back(chainBlock[j]);
   }
 };
 
