@@ -154,14 +154,14 @@ private:
     }
     for (Byte i = BLOCK_SIZE / 2; i < BLOCK_SIZE; ++i) {
       Byte shift = (1 << 3) * (i - BLOCK_SIZE / 2);
-      out[i] = (A >> shift) & 0xff;
+      out[i] = (B >> shift) & 0xff;
     }
     return out;
   }
 
   void blockEncrypt() {
     auto in = getLittleEndianWords(inputBlock);
-    auto encrypted = RC5<Word, r, b>::encrypt();
+    auto encrypted = RC5<Word, r, b>::encrypt(in);
     chainBlock = getBlock(encrypted);
   }
 
@@ -188,7 +188,9 @@ private:
   }
 
   void encryptFinal(std::vector<Byte> &C) {
-    assert(pad == Type::NoPad && inputBlockIndex == 0);
+    assert(pad == Type::Pad || inputBlockIndex == 0);
+    if (pad == Type::NoPad)
+      return;
     Byte padLength = BLOCK_SIZE - inputBlockIndex;
     for( Byte j = 0; j < padLength; ++j){
       inputBlock[inputBlockIndex] = padLength;
