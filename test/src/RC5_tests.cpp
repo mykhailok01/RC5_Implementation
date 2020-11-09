@@ -2,6 +2,7 @@
 #include <RC5.hpp>
 #include <Utility.hpp>
 #include <iostream>
+#include <algorithm>
 
 using namespace rc5;
 template <class Word, Byte r, Byte b>
@@ -57,23 +58,27 @@ TEST_F(ByteArrayToHexStringTest, AllZero) {
   verify(std::array<Byte, 4>{}, "00000000");
 }
 
-template <class Word, Byte r, Byte b>
+template <class Word, Byte r, Byte b, Type pad>
 class RC5CBCEncryptDecryptTest : public ::testing::Test {
-public:
-  using RC5_CBCT = RC5_CBC<Word, r, b, Type::NoPad>;
-
 protected:
-  void SetUp() override{};
-  void TearDown() override{};
+  void SetUp() override{}
+  void TearDown() override{}
+
+  static constexpr Byte BLOCK_SIZE = RC5_CBC<Word, r, b, pad>::BLOCK_SIZE;
+  auto rc5(const std::array<Byte, b> &K,
+           const std::array<Byte, BLOCK_SIZE> I = {}) const {
+    return RC5_CBC<Word, r, b, pad>(K, I);
+  }
+  bool equal(const std::vector<Byte> &first,const std::vector<Byte> &second) {
+    return std::equal(first.cbegin(), first.cend(), second.cbegin(), second.cend());
+  }
 };
 
 using RC5CBC_32_0_1EncryptDecryptTest =
-    RC5CBCEncryptDecryptTest<std::uint32_t, 0, 1>;
+    RC5CBCEncryptDecryptTest<std::uint32_t, 0, 1, Type::NoPad>;
 TEST_F(RC5CBC_32_0_1EncryptDecryptTest, AllZeroOnlyEncrypt) {
-  auto rc5 = RC5CBC_32_0_1EncryptDecryptTest::RC5_CBCT({0x00}, {});
+  auto rc5 = RC5CBC_32_0_1EncryptDecryptTest::rc5({0x00}, {});
   std::vector<Byte> result;
   rc5.encrypt(std::vector<Byte>(8, 0x00), result);
-  EXPECT_EQ(toHexString(result), "7A7BBA4D79111D1E");
+  EXPECT_TRUE(equal(result, {0x7A, 0x7B, 0xBA, 0x4D, 0x79, 0x11, 0x1D, 0x1E}));
 }
-
-
