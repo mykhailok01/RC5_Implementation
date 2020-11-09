@@ -115,21 +115,26 @@ public:
 private:
   using Block = std::array<Byte, BLOCK_SIZE>;
   const Block I;
-  Block inputBlock;
+  Block plainBlock;
   Block chainBlock;
-  Byte inputBlockIndex;
+  Byte plainBlockIndex;
 
 public:
   explicit RC5_CBC(const std::array<Byte, b> &K,
                    const std::array<Byte, BLOCK_SIZE> I = {})
-      : RC5<Word, r, b>(K), I(I), inputBlock{}, chainBlock(I),
-        inputBlockIndex(0) {}
+      : RC5<Word, r, b>(K), I(I), plainBlock{}, chainBlock(I),
+        plainBlockIndex(0) {}
 
   void encrypt(const std::vector<Byte> &plainText,
-                     std::vector<Byte> &C)
+                     std::vector<Byte> &encryptedText)
   {
-    encryptUpdate(plainText, C);
-    encryptFinal(C);
+    encryptUpdate(plainText, encryptedText);
+    encryptFinal(encryptedText);
+  }
+  void decrypt(const std::vector<Byte> &encryptedText,
+                     std::vector<Byte> &plainText) {
+    assert(encryptedText.size() && !(encryptedText.size() % BLOCK_SIZE));
+    decryptUpdate(encryptedText, plainText);
   }
 
 private:
@@ -160,47 +165,78 @@ private:
   }
 
   void blockEncrypt() {
-    auto in = getLittleEndianWords(inputBlock);
+    auto in = getLittleEndianWords(plainBlock);
     auto encrypted = RC5<Word, r, b>::encrypt(in);
     chainBlock = getBlock(encrypted);
   }
 
   void encryptUpdate(const std::vector<Byte> &plainText,
-                     std::vector<Byte> &C) {
+                     std::vector<Byte> &encryptedText) {
     using SizeT = std::vector<Byte>::size_type;
     SizeT N = plainText.size();
     SizeT plainIndex = 0;
     while (plainIndex < N) {
-      if (inputBlockIndex < BLOCK_SIZE) {
-        inputBlock[inputBlockIndex] = plainText[plainIndex];
-        ++inputBlockIndex;
+      if (plainBlockIndex < BLOCK_SIZE) {
+        plainBlock[plainBlockIndex] = plainText[plainIndex];
+        ++plainBlockIndex;
         ++plainIndex;
       }
-      if (inputBlockIndex == BLOCK_SIZE) {
-        inputBlockIndex = 0;
+      if (plainBlockIndex == BLOCK_SIZE) {
+        plainBlockIndex = 0;
         for (Byte j = 0; j < BLOCK_SIZE; ++j)
-          inputBlock[j] ^= chainBlock[j];
+          plainBlock[j] ^= chainBlock[j];
         blockEncrypt();
         for (Byte j = 0; j < BLOCK_SIZE; ++j)
-          C.push_back(chainBlock[j]);
+          encryptedText.push_back(chainBlock[j]);
       }
     }
   }
 
-  void encryptFinal(std::vector<Byte> &C) {
-    assert(pad == Type::Pad || inputBlockIndex == 0);
+  void encryptFinal(std::vector<Byte> &encryptedText) {
+    assert(pad == Type::Pad || plainBlockIndex == 0);
     if (pad == Type::NoPad)
       return;
-    Byte padLength = BLOCK_SIZE - inputBlockIndex;
+    Byte padLength = BLOCK_SIZE - plainBlockIndex;
     for( Byte j = 0; j < padLength; ++j){
-      inputBlock[inputBlockIndex] = padLength;
-      ++inputBlockIndex;
+      plainBlock[plainBlockIndex] = padLength;
+      ++plainBlockIndex;
     }
     for (Byte j = 0; j < BLOCK_SIZE; ++j)
-      inputBlock[j] ^= chainBlock[j];
+      plainBlock[j] ^= chainBlock[j];
     blockEncrypt();
     for (Byte j = 0; j < BLOCK_SIZE; ++j)
-      C.push_back(chainBlock[j]);
+      encryptedText.push_back(chainBlock[j]);
+  }
+
+  void blockDecrypt() {
+    auto in = getLittleEndianWords(chainBlock);
+    auto plain = RC5<Word, r, b>::encrypt(in);
+    chainBlock = getBlock(plain);
+  }
+
+  void decryptUpdate(const std::vector<Byte> &encryptedText,
+                     std::vector<Byte> &plainText) {
+    using SizeT = std::vector<Byte>::size_type;
+    SizeT encryptedIndex = 0;
+    Byte encryptedBlockIndex = 0;
+    auto prevBlockChain = I;
+    while (encryptedIndex < encryptedText.size()) {
+      if (encryptedBlockIndex < BLOCK_SIZE) {
+        chainBlock[encryptedBlockIndex] = encryptedText[encryptedIndex];
+        ++encryptedBlockIndex;
+        ++encryptedIndex;
+      }
+      if (encryptedBlockIndex == BLOCK_SIZE)
+      {
+        encryptedBlockIndex = 0;
+        blockDecrypt();
+        for (Byte j = 0; j < BLOCK_SIZE; ++j) {
+          plainBlock[j] ^= prevBlockChain[j];
+          plainText.push_back(plainBlock[j]);
+        }
+        prevBlockChain = chainBlock;
+      }
+    }
   }
 };
 
