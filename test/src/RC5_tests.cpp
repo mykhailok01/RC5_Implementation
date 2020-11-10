@@ -33,9 +33,9 @@ TEST_F(RC5_32_12_16Test, 0fff_0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f) {
                         0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f});
 }
 
-using RC5_32_8_5Test = RC5Test<std::uint32_t, 5, 8>;
+using RC5_32_8_5Test = RC5Test<std::uint32_t, 8, 5>;
 TEST_F(RC5_32_8_5Test, WithKey) {
-  verify({0xffffffff, 0xffffffff}, {0x01, 0x02, 0x03, 0x04, 0x05}, std::pair{0x7875dbf6,0x738c6478});
+  verify({0xffffffff, 0xffffffff}, {0x01, 0x02, 0x03, 0x04, 0x05}, std::pair{0xf6db7578, 0x78648c73});
 }
 
 template <class Container> class ToHexStringTest : public ::testing::Test {

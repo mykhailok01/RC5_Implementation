@@ -34,7 +34,7 @@ template <>
 const std::uint64_t RC5Consts<std::uint64_t>::Q = 0x9E3779B97F4A7C15;
 
 template <class Word, Byte r, Byte b> class RC5 {
-  static constexpr Byte c = std::max(1, b / RC5Consts<Word>::u);
+  static constexpr Byte c = (b + RC5Consts<Word>::u - 1) / RC5Consts<Word>::u;
   std::array<Word, c> L;
 
   static constexpr Byte t = 2 * (r + 1);
@@ -49,11 +49,11 @@ public:
   }
   std::pair<Word, Word> encrypt(const std::pair<Word, Word> in) {
     Word A = in.first, B = in.second;
-    A += S[0];
-    B += S[1];
+    A += S.at(0);
+    B += S.at(1);
     for (Byte i = 1; i <= r; ++i) {
-      A = leftRotate(A ^ B, B) + S[2 * i];
-      B = leftRotate(B ^ A, A) + S[2 * i + 1];
+      A = leftRotate(A ^ B, B) + S.at(2 * i);
+      B = leftRotate(B ^ A, A) + S.at(2 * i + 1);
     }
     return std::pair(A, B);
   }
@@ -61,11 +61,11 @@ public:
   std::pair<Word, Word> decrypt(const std::pair<Word, Word> in) {
     Word A = in.first, B = in.second;
     for (Byte i = r; i >= 1; --i) {
-      B = rightRotate(B - S[2 * i + 1], A) ^ A;
-      A = rightRotate(A - S[2 * i], B) ^ B;
+      B = rightRotate(B - S.at(2 * i + 1), A) ^ A;
+      A = rightRotate(A - S.at(2 * i), B) ^ B;
     }
-    B -= S[1];
-    A -= S[0];
+    B -= S.at(1);
+    A -= S.at(0);
     return std::pair(A, B);
   }
 
@@ -82,21 +82,21 @@ private:
     if (b)
       for (Byte index = b; index > 0; --index) {
         Byte i = index - 1;
-        L[i / RC5Consts<Word>::u] = (L[i / RC5Consts<Word>::u] << 8) + K[i];
+        L.at(i / RC5Consts<Word>::u) = (L.at(i / RC5Consts<Word>::u) << 8) + K.at(i);
       }
   }
   void initS() {
-    S[0] = RC5Consts<Word>::P;
+    S.at(0) = RC5Consts<Word>::P;
     for (Byte i = 1; i < t; i++)
-      S[i] = S[i - 1] + RC5Consts<Word>::Q;
+      S.at(i) = S.at(i - 1) + RC5Consts<Word>::Q;
   }
   void mixSL() {
     Byte i = 0, j = 0;
     Word A = 0, B = 0;
     for (uint16_t iteration = 0, count = 3 * std::max(t, c); iteration < count;
          ++iteration) {
-      A = S[i] = leftRotate(S[i] + A + B, 3);
-      B = L[j] = leftRotate(L[j] + A + B, A + B);
+      A = S.at(i) = leftRotate(S.at(i) + A + B, 3);
+      B = L.at(j) = leftRotate(L.at(j) + A + B, A + B);
       i = (i + 1) % t;
       j = (j + 1) % c;
     }
@@ -110,6 +110,7 @@ enum class Type {
 
 template <class Word, Byte r, Byte b, Type pad>
 class RC5_CBC : private RC5<Word, r, b> {
+  using SizeT = std::vector<Byte>::size_type;
 public:
   using RC5<Word, r, b>::BLOCK_SIZE; // BB
 private:
@@ -172,7 +173,6 @@ private:
 
   void encryptUpdate(const std::vector<Byte> &plainText,
                      std::vector<Byte> &encryptedText) {
-    using SizeT = std::vector<Byte>::size_type;
     SizeT N = plainText.size();
     SizeT plainIndex = 0;
     while (plainIndex < N) {
@@ -197,7 +197,7 @@ private:
     if (pad == Type::NoPad)
       return;
     Byte padLength = BLOCK_SIZE - plainBlockIndex;
-    for( Byte j = 0; j < padLength; ++j){
+    for (Byte j = 0; j < padLength; ++j){
       plainBlock[plainBlockIndex] = padLength;
       ++plainBlockIndex;
     }
@@ -210,16 +210,15 @@ private:
 
   void blockDecrypt() {
     auto in = getLittleEndianWords(chainBlock);
-    auto plain = RC5<Word, r, b>::encrypt(in);
-    chainBlock = getBlock(plain);
+    auto plain = RC5<Word, r, b>::decrypt(in);
+    plainBlock = getBlock(plain);
   }
 
   void decryptUpdate(const std::vector<Byte> &encryptedText,
                      std::vector<Byte> &plainText) {
-    using SizeT = std::vector<Byte>::size_type;
     SizeT encryptedIndex = 0;
     Byte encryptedBlockIndex = 0;
-    auto prevBlockChain = I;
+    auto prevChainBlock = I;
     while (encryptedIndex < encryptedText.size()) {
       if (encryptedBlockIndex < BLOCK_SIZE) {
         chainBlock[encryptedBlockIndex] = encryptedText[encryptedIndex];
@@ -230,11 +229,16 @@ private:
       {
         encryptedBlockIndex = 0;
         blockDecrypt();
-        for (Byte j = 0; j < BLOCK_SIZE; ++j) {
-          plainBlock[j] ^= prevBlockChain[j];
+        for (Byte j = 0; j < BLOCK_SIZE; ++j)
+          plainBlock[j] ^= prevChainBlock[j];
+
+        Byte lastShift = 0;
+        if (pad == Type::Pad && encryptedIndex == encryptedText.size())
+          lastShift = plainBlock.back();
+        else
+          prevChainBlock = chainBlock;
+        for (Byte j = 0; j < BLOCK_SIZE - lastShift; ++j)
           plainText.push_back(plainBlock[j]);
-        }
-        prevBlockChain = chainBlock;
       }
     }
   }
