@@ -1,12 +1,12 @@
 #ifndef RC5_HPP
 #define RC5_HPP
 #include <array>
+#include <cassert>
 #include <climits>
 #include <cstdint>
 #include <type_traits>
 #include <utility>
 #include <vector>
-#include <cassert>
 
 namespace rc5 {
 using Byte = uint8_t;
@@ -82,7 +82,8 @@ private:
     if (b)
       for (Byte index = b; index > 0; --index) {
         Byte i = index - 1;
-        L.at(i / RC5Consts<Word>::u) = (L.at(i / RC5Consts<Word>::u) << 8) + K.at(i);
+        L.at(i / RC5Consts<Word>::u) =
+            (L.at(i / RC5Consts<Word>::u) << 8) + K.at(i);
       }
   }
   void initS() {
@@ -103,14 +104,12 @@ private:
   }
 };
 
-enum class Type {
-  NoPad,
-  Pad
-};
+enum class Type { NoPad, Pad };
 
 template <class Word, Byte r, Byte b, Type pad>
 class RC5_CBC : private RC5<Word, r, b> {
   using SizeT = std::vector<Byte>::size_type;
+
 public:
   using RC5<Word, r, b>::BLOCK_SIZE; // BB
 private:
@@ -119,26 +118,6 @@ private:
   Block plainBlock;
   Block chainBlock;
   Byte plainBlockIndex;
-
-public:
-  explicit RC5_CBC(const std::array<Byte, b> &K,
-                   const std::array<Byte, BLOCK_SIZE> I = {})
-      : RC5<Word, r, b>(K), I(I), plainBlock{}, chainBlock(I),
-        plainBlockIndex(0) {}
-
-  void encrypt(const std::vector<Byte> &plainText,
-                     std::vector<Byte> &encryptedText)
-  {
-    encryptUpdate(plainText, encryptedText);
-    encryptFinal(encryptedText);
-  }
-  void decrypt(const std::vector<Byte> &encryptedText,
-                     std::vector<Byte> &plainText) {
-    assert(encryptedText.size() && !(encryptedText.size() % BLOCK_SIZE));
-    decryptUpdate(encryptedText, plainText);
-  }
-
-private:
   std::pair<Word, Word> getLittleEndianWords(Block bytes) {
     Word A = 0, B = 0;
     for (Byte i = 0; i < BLOCK_SIZE / 2; ++i) {
@@ -171,6 +150,17 @@ private:
     chainBlock = getBlock(encrypted);
   }
 
+public:
+  explicit RC5_CBC(const std::array<Byte, b> &K,
+                   const std::array<Byte, BLOCK_SIZE> I = {})
+      : RC5<Word, r, b>(K), I(I), plainBlock{}, chainBlock(I),
+        plainBlockIndex(0) {}
+
+  void encrypt(const std::vector<Byte> &plainText,
+               std::vector<Byte> &encryptedText) {
+    encryptUpdate(plainText, encryptedText);
+    encryptFinal(encryptedText);
+  }
   void encryptUpdate(const std::vector<Byte> &plainText,
                      std::vector<Byte> &encryptedText) {
     SizeT N = plainText.size();
@@ -197,7 +187,7 @@ private:
     if (pad == Type::NoPad)
       return;
     Byte padLength = BLOCK_SIZE - plainBlockIndex;
-    for (Byte j = 0; j < padLength; ++j){
+    for (Byte j = 0; j < padLength; ++j) {
       plainBlock[plainBlockIndex] = padLength;
       ++plainBlockIndex;
     }
@@ -214,6 +204,13 @@ private:
     plainBlock = getBlock(plain);
   }
 
+  void decrypt(const std::vector<Byte> &encryptedText,
+               std::vector<Byte> &plainText) {
+    assert(encryptedText.size() && !(encryptedText.size() % BLOCK_SIZE));
+    decryptUpdate(encryptedText, plainText);
+  }
+
+private:
   void decryptUpdate(const std::vector<Byte> &encryptedText,
                      std::vector<Byte> &plainText) {
     SizeT encryptedIndex = 0;
@@ -225,8 +222,7 @@ private:
         ++encryptedBlockIndex;
         ++encryptedIndex;
       }
-      if (encryptedBlockIndex == BLOCK_SIZE)
-      {
+      if (encryptedBlockIndex == BLOCK_SIZE) {
         encryptedBlockIndex = 0;
         blockDecrypt();
         for (Byte j = 0; j < BLOCK_SIZE; ++j)
