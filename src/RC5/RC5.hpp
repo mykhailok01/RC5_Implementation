@@ -7,6 +7,7 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <optional>
 
 namespace rc5 {
 using Byte = uint8_t;
@@ -118,6 +119,8 @@ private:
   Block plainBlock;
   Block chainBlock;
   Byte plainBlockIndex;
+  std::optional<std::size_t> realEncryptedTextSize;
+  size_t realTextIndex;
   std::pair<Word, Word> getLittleEndianWords(Block bytes) {
     Word A = 0, B = 0;
     for (Byte i = 0; i < BLOCK_SIZE / 2; ++i) {
@@ -198,10 +201,9 @@ public:
       encryptedText.push_back(chainBlock[j]);
   }
 
-  void blockDecrypt() {
-    auto in = getLittleEndianWords(chainBlock);
-    auto plain = RC5<Word, r, b>::decrypt(in);
-    plainBlock = getBlock(plain);
+  void setRealEncryptedTextSize(std::size_t size) {
+    realEncryptedTextSize = size;
+    realTextIndex = 0;
   }
 
   void decrypt(const std::vector<Byte> &encryptedText,
@@ -211,6 +213,11 @@ public:
   }
 
 private:
+  void blockDecrypt() {
+    auto in = getLittleEndianWords(chainBlock);
+    auto plain = RC5<Word, r, b>::decrypt(in);
+    plainBlock = getBlock(plain);
+  }
   void decryptUpdate(const std::vector<Byte> &encryptedText,
                      std::vector<Byte> &plainText) {
     SizeT encryptedIndex = 0;
@@ -221,6 +228,7 @@ private:
         chainBlock[encryptedBlockIndex] = encryptedText[encryptedIndex];
         ++encryptedBlockIndex;
         ++encryptedIndex;
+        ++realTextIndex;
       }
       if (encryptedBlockIndex == BLOCK_SIZE) {
         encryptedBlockIndex = 0;
@@ -229,7 +237,8 @@ private:
           plainBlock[j] ^= prevChainBlock[j];
 
         Byte lastShift = 0;
-        if (pad == Type::Pad && encryptedIndex == encryptedText.size())
+        if (pad == Type::Pad && encryptedIndex == encryptedText.size() &&
+            (!realEncryptedTextSize || realTextIndex == realEncryptedTextSize.value()))
           lastShift = plainBlock.back();
         else
           prevChainBlock = chainBlock;
