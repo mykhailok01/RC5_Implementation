@@ -1,13 +1,12 @@
-#include <RC5.hpp>
 #include <argparse/argparse.hpp>
 #include <limits>
 #include <fstream>
 
+#include "Common.hpp"
+
 void encrypt(std::istream &in, std::ostream &out, const std::string& password) {
-  using RC5Type = rc5::RC5_CBC<std::uint16_t, 12, 16, rc5::Type::Pad>;//TODO
-  
-  RC5Type algorithm = RC5Type({1,2,3,4,5}, {});
-  constexpr std::streamsize BUFFER_SIZE = RC5Type::BLOCK_SIZE * 20;
+  RC5Type algorithm = RC5Type(getRC5Key(password), {});
+  constexpr std::streamsize BUFFER_SIZE = RC5Type::BLOCK_SIZE * 30;
   do {
     std::vector<rc5::Byte> inBuffer(BUFFER_SIZE);
     in.read(reinterpret_cast<char *>(inBuffer.data()), BUFFER_SIZE);

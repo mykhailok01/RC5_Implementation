@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 #include <optional>
+#include <iostream>
 
 namespace rc5 {
 using Byte = uint8_t;
@@ -17,22 +18,12 @@ template <class Word> struct RC5Consts {
                     std::is_same<Word, std::uint32_t>::value ||
                     std::is_same<Word, std::uint64_t>::value,
                 "Word can only be uint16_t, uint32_t or uint64_t");
-  static const Word P;
-  static const Word Q;
-  static const Byte w = sizeof(Word) * CHAR_BIT;
-  static const Byte u = (sizeof(Word) * CHAR_BIT) / 8;
+  static constexpr Byte w = sizeof(Word) * CHAR_BIT;
+  static constexpr Byte u = (sizeof(Word) * CHAR_BIT) / 8;
+  static constexpr Word ODD(Word w) { return w % 2 ? w : w + 1; }
+  static constexpr Word P = ODD(static_cast<Word>(0.718281828459 * (1ul << w)));//ODD(e - 2) * 2^w
+  static constexpr Word Q = ODD(static_cast<Word>(0.61803398875 * (1ul << w)));//ODD(f - 1) * 2^w
 };
-
-template <> const std::uint16_t RC5Consts<std::uint16_t>::P = 0xB7E1;
-template <> const std::uint16_t RC5Consts<std::uint16_t>::Q = 0x9E37;
-
-template <> const std::uint32_t RC5Consts<std::uint32_t>::P = 0xB7E15163;
-template <> const std::uint32_t RC5Consts<std::uint32_t>::Q = 0x9E3779B9;
-
-template <>
-const std::uint64_t RC5Consts<std::uint64_t>::P = 0xB7E151628AED2A6B;
-template <>
-const std::uint64_t RC5Consts<std::uint64_t>::Q = 0x9E3779B97F4A7C15;
 
 template <class Word, Byte r, Byte b> class RC5 {
   static constexpr Byte c = (b + RC5Consts<Word>::u - 1) / RC5Consts<Word>::u;
@@ -42,6 +33,8 @@ template <class Word, Byte r, Byte b> class RC5 {
   std::array<Word, t> S;
 
 public:
+  static constexpr Byte ROUNDS_COUNT = r;
+  static constexpr Byte KEY_LENGTH = b;
   static constexpr Byte BLOCK_SIZE = RC5Consts<Word>::u * 2;
   explicit RC5(const std::array<Byte, b> &K) : L{}, S{} {
     initL(K);
@@ -112,13 +105,17 @@ class RC5_CBC : private RC5<Word, r, b> {
   using SizeT = std::vector<Byte>::size_type;
 
 public:
+  using RC5<Word, r, b>::KEY_LENGTH;
+  using RC5<Word, r, b>::ROUNDS_COUNT;
   using RC5<Word, r, b>::BLOCK_SIZE; // BB
+  
 private:
   using Block = std::array<Byte, BLOCK_SIZE>;
   const Block I;
   Block plainBlock;
   Block chainBlock;
   Byte plainBlockIndex;
+  Block prevChainBlock;
   std::optional<std::size_t> realEncryptedTextSize;
   size_t realTextIndex;
   std::pair<Word, Word> getLittleEndianWords(Block bytes) {
@@ -157,7 +154,7 @@ public:
   explicit RC5_CBC(const std::array<Byte, b> &K,
                    const std::array<Byte, BLOCK_SIZE> I = {})
       : RC5<Word, r, b>(K), I(I), plainBlock{}, chainBlock(I),
-        plainBlockIndex(0) {}
+        plainBlockIndex(0), prevChainBlock(I) {}
 
   void encrypt(const std::vector<Byte> &plainText,
                std::vector<Byte> &encryptedText) {
@@ -222,7 +219,6 @@ private:
                      std::vector<Byte> &plainText) {
     SizeT encryptedIndex = 0;
     Byte encryptedBlockIndex = 0;
-    auto prevChainBlock = I;
     while (encryptedIndex < encryptedText.size()) {
       if (encryptedBlockIndex < BLOCK_SIZE) {
         chainBlock[encryptedBlockIndex] = encryptedText[encryptedIndex];
@@ -242,8 +238,9 @@ private:
           lastShift = plainBlock.back();
         else
           prevChainBlock = chainBlock;
-        for (Byte j = 0; j < BLOCK_SIZE - lastShift; ++j)
+        for (Byte j = 0; j < BLOCK_SIZE - lastShift; ++j){
           plainText.push_back(plainBlock[j]);
+        }
       }
     }
   }

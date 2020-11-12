@@ -43,7 +43,7 @@ protected:
   void SetUp() override{};
   void TearDown() override{};
   virtual void verify(Container c, std::string expected) {
-    std::string actual = toHexString(c);
+    std::string actual = toHexString(std::cbegin(c), std::cend(c));
     EXPECT_EQ(actual, expected);
   }
 };
