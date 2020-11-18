@@ -1,0 +1,12 @@
+cmake_minimum_required(VERSION 3.2)
+project(md5 C CXX)
+
+set(SOURCE_FILES
+    MD5.hpp
+    MD5.cpp
+)
+
+add_library(md5 SHARED STATIC ${SOURCE_FILES})
+
+install(TARGETS md5 DESTINATION ${PROJECT_INSTALL_LIB_DIR})
+install(FILES MD5.hpp DESTINATION ${PROJECT_INSTALL_INCLUDE_DIR})
