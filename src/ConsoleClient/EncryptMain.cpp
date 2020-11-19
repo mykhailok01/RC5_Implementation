@@ -5,7 +5,7 @@
 #include "Common.hpp"
 
 void encrypt(std::istream &in, std::ostream &out, const std::string& password) {
-  RC5Type algorithm = RC5Type(getRC5Key(password), {});
+  RC5Type algorithm = RC5Type(getRC5Key(password), {getIV()});
   constexpr std::streamsize BUFFER_SIZE = RC5Type::BLOCK_SIZE * 30;
   do {
     std::vector<rc5::Byte> inBuffer(BUFFER_SIZE);

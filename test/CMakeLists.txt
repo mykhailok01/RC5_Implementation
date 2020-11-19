@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.2)
 project(unit_tests)
 
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 add_subdirectory(lib/googletest)
 include_directories(lib/googletest/googletest/include)
 

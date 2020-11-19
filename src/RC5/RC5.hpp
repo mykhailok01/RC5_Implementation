@@ -21,8 +21,8 @@ template <class Word> struct RC5Consts {
   static constexpr Byte w = sizeof(Word) * CHAR_BIT;
   static constexpr Byte u = (sizeof(Word) * CHAR_BIT) / 8;
   static constexpr Word ODD(Word w) { return w % 2 ? w : w + 1; }
-  static constexpr Word P = ODD(static_cast<Word>(0.718281828459 * (1ul << w)));//ODD(e - 2) * 2^w
-  static constexpr Word Q = ODD(static_cast<Word>(0.61803398875 * (1ul << w)));//ODD(f - 1) * 2^w
+  static constexpr Word P = ODD(static_cast<Word>(0.718281828459 * (1ull << w)));//ODD(e - 2) * 2^w
+  static constexpr Word Q = ODD(static_cast<Word>(0.618033988750 * (1ull << w)));//ODD(f - 1) * 2^w
 };
 
 template <class Word, Byte r, Byte b> class RC5 {
